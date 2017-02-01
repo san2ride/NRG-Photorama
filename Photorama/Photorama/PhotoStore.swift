@@ -24,12 +24,16 @@ class PhotoStore {
             
             if let jsonData = data {
                 
-                if let jsonString = NSString(data: jsonData, encoding: String.Encoding.utf8.rawValue) {
-                    print(jsonString)
+            do {
+                let jsonObject: Any
+                    = try JSONSerialization.jsonObject(with: jsonData, options: [])
+                print(jsonObject)
+            }
+            catch let error {
+                print("Error creating JSON object: \(error)")
                 }
             }
             else if let requestError = error {
-                
                 print("Error fetching recent photos: \(requestError)")
             }
             else {

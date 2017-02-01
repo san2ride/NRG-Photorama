@@ -20,9 +20,6 @@ class PhotosViewController: UIViewController {
     }
         
         
-        
-    
-
     
     
 
