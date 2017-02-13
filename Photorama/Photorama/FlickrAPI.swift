@@ -13,100 +13,112 @@ enum Method: String {
 }
 
 enum PhotosResult {
-    case Success([Photo])
-    case Failure(Error)
+    case success([Photo])
+    case failure(Error)
 }
 
 enum FlickrError: Error {
-    case InvalidJSONData
+    case invalidJSONData
 }
 
 struct FlickrAPI {
     
-    private static let baseURLString = "https://api.flickr.com/services/rest"
-    private static let APIKey = "6bbd2c01665f0c3344bdcd027d56bf9a"
-    private static let APISecret = "d22b5337a3ec0019"
+    fileprivate static let baseURLString = "https://api.flickr.com/services/rest"
+    fileprivate static let APIKey = "a6d819499131071f158fd740860a5a88"
+//    fileprivate static let APISecret = "d22b5337a3ec0019"
     
-    private static let dateFormatter: DateFormatter = {
+    fileprivate static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return formatter
     }()
     
-    private static func flickrURL(method: Method, parameters: [String:String]?) -> NSURL {
+    fileprivate static func flickrURL(method: Method, parameters: [String:String]?) -> URL {
         
-        let components = NSURLComponents(string: baseURLString)!
+        var components = URLComponents(string: baseURLString)!
         
-        var queryItems = [NSURLQueryItem]()
+        var queryItems = [URLQueryItem]()
         
         let baseParams = [
             "method": method.rawValue,
             "format": "json",
             "nojsoncallback": "1",
             "api_key": APIKey,
-            "api_secret": APISecret
+//            "api_secret": APISecret
         ]
         
-        for (key, value) in baseParams {
+        for (key,value) in baseParams {
             
-            let item = NSURLQueryItem(name: key, value: value)
+            let item = URLQueryItem(name: key, value: value)
             queryItems.append(item)
         }
         
         if let additionalParams = parameters {
-            
             for (key, value) in additionalParams {
-                
-                let item = NSURLQueryItem(name: key, value: value)
+                let item = URLQueryItem(name: key, value: value)
                 queryItems.append(item)
             }
-            
         }
-        components.queryItems = queryItems as [URLQueryItem]?
         
-        return components.url! as NSURL
+        components.queryItems = queryItems
+        return components.url!
     }
     
-    private static func photoFromJSONObject(json: [String : AnyObject]) -> Photo? {
+    static func recentPhotosURL() -> URL {
+        return flickrURL(method: Method.RecentPhotos, parameters: ["extras": "url_h,date_taken"])
+    }
+    
+    fileprivate static func photoFromJSONObject(json: [String : AnyObject]) -> Photo? {
+        
         guard let
             photoID = json["id"] as? String,
-            title = json["title"] as? String,
-            dateString = json["dateTaken"] as? String,
-            phot0URLString = json["url_h"] as? String,
-            url = URL(string: photoURLString),
-            dateTaken = dateFormatter.date(from: dateString) else {
-                
+            let title = json["title"] as? String,
+            let dateString = json["dateTaken"] as? String,
+            let photoURLString = json["url_h"] as? String,
+            let url = URL(string: photoURLString),
+            let dateTaken = dateFormatter.date(from: dateString) else {
+            
                 return nil
         }
-        
         return Photo(title: title, photoID: photoID, remoteURL: url, dateTaken: dateTaken)
     }
     
-    static func photosFromJSONData(data: NSData) -> PhotosResult {
+    static func photosFromJSONData(_ data: Data) -> PhotosResult {
+        
         do {
             let jsonObject: Any
-                    = try JSONSerialization.jsonObject(with: data as Data, options: [])
+                    = try JSONSerialization.jsonObject(with: data, options: [])
+            // The top level json is an object
+            // with a key photos, that is an an object
+            // with a key photo, that is an array of objects
+            // This array of objects contains a keys we are interested in to
+            // get the actual image: "url_h".
+            //print(NSString(data: data, encoding: NSUTF8StringEncoding)!)
             
             guard let
-                jsonDictionary = jsonObject as? [NSObject:AnyObject],
-                photos = jsonDictionary["photos"] as? [String:AnyObject],
-                photosArray = photos["photo"] as? [[String:AnyObject]] else {
-                
-                    return .Failure(FlickrError.InvalidJSONData)
+                jsonDictionary = jsonObject as? [AnyHashable: Any],
+                let photos = jsonDictionary["photos"] as? [String:AnyObject],
+                let photosArray = photos["photo"] as? [[String:AnyObject]] else {
+                    
+                    return .failure(FlickrError.invalidJSONData)
             }
             
             var finalPhotos = [Photo]()
-            return .Success(finalPhotos)
-        }
-        catch let error {
-            return .Failure(error)
+            for photoJSON in photosArray {
+                if let photo = photoFromJSONObject(json: photoJSON) {
+                    finalPhotos.append(photo)
+                }
+            }
+            
+            if finalPhotos.count == 0 && photosArray.count > 0 {
+                // We weren't able to parse any of the photos
+                // Maybe the JSON format for photos has changed
+                return .failure(FlickrError.invalidJSONData)
+            }
+            return .success(finalPhotos)
+        } catch let error {
+            return .failure(error)
         }
     }
-    
-    static func recentPhotosURL() -> NSURL {
-        return flickrURL(method: .RecentPhotos, parameters: ["extras": "url_h,date_taken"])
-    }
-    
-    
 }
 

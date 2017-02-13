@@ -16,7 +16,19 @@ class PhotosViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        store.fetchRecentPhotos()
+        store.fetchRecentPhotos() {
+            (photosResult) -> Void in
+            // This block gets called once we have processed rest API
+            // and receivedd a list of recent photos and their URLs
+            // We then retrieved the very first image
+            
+            switch photosResult {
+            case let .success(photos):
+                print("Succesfully found \(photos.count) recent photos")
+            case let .failure(error):
+                print("Error fetching recent photos: \(error)")
+            }
+        }
     }
         
         
